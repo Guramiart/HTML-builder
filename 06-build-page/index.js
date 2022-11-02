@@ -1,84 +1,90 @@
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
-const { stdout } = require('node:process');
 
-const destPath = path.join(__dirname, 'project-dist');
-const samplePath = path.join(__dirname, 'template.html');
-const pagePath = path.join(destPath, 'index.html');
-const componentsPath = path.join(__dirname, 'components');
-const srcStylesPath = path.join(__dirname, 'styles');
-const srcAssetPath = path.join(__dirname, 'assets');
-const mergeStylePath = path.join(destPath, 'style.css');
-const destAssetPath = path.join(destPath, 'assets');
+const ENCODE = 'utf-8';
 
-build();
+const DEST_PATH = path.join(__dirname, 'project-dist');
 
-async function build() {
-    await createDirectory(destPath);
-    await createDirectory(destAssetPath);
-    buildTemplate(samplePath, componentsPath, pagePath);
-    copyAssets(srcAssetPath, destAssetPath);
-    mergeStyles(srcStylesPath, mergeStylePath);
+const TEMPLATE_PATH = path.join(__dirname, 'template.html');
+const COMPONENT_PATH = path.join(__dirname, 'components');
+const PAGE_PATH = path.join(DEST_PATH, 'index.html');
+
+const ASSET_PATH = path.join(__dirname, 'assets');
+const DEST_ASSET_PATH = path.join(DEST_PATH, 'assets');
+
+const STYLE_PATH = path.join(__dirname, 'styles');
+const DEST_STYLE_PATH = path.join(DEST_PATH, 'style.css');
+
+createDirectory(DEST_PATH);
+buildTemplate();
+buildAssets(ASSET_PATH, DEST_ASSET_PATH);
+mergeStyles(STYLE_PATH, DEST_STYLE_PATH);
+
+async function createDirectory(path) {
+    await fs.promises.mkdir(path, {recursive: true});
 }
 
-function createDirectory(path) {
-    return new Promise(resolve => {
-        fs.mkdir(path, {recursive: true}, (err) => {
-            if(err) throw err;
-            resolve(`Succes`);
-        });
+async function buildTemplate() {
+    let tempData = await fs.promises.readFile(TEMPLATE_PATH, ENCODE).then((data) => data);
+    fs.readdir(COMPONENT_PATH, {withFileTypes: true}, async (err, components) => {
+        if(err) { throw err; }
+        for(let component of components) {
+            let name = path.basename(component.name).split('.').slice(0, -1);
+            if(tempData.includes(`{{${name}}}`)) {
+                await fs.promises.readFile(path.join(COMPONENT_PATH, path.basename(component.name)), ENCODE).then((data) => {
+                    tempData = tempData.replace(`{{${name}}}`, data);
+                });
+            }
+        }
+        await fs.promises.writeFile(PAGE_PATH, tempData);
     });
 }
 
-function buildTemplate(srcPath, component, destPath) {
-    
+function buildAssets(src, dest) {
+    fs.readdir(src, {withFileTypes: true}, async (err, files) => {
+        if(err) { throw err; }
+        for(let file of files) {
+            if(file.isDirectory()) {
+                let directoryPath = path.join(dest, path.basename(file.name));
+                await createDirectory(directoryPath);
+                buildAssets(path.join(src, path.basename(file.name)), directoryPath);
+            } else if(file.isFile()) {
+                fs.copyFile(path.join(src, file.name), path.join(dest, file.name), (err) => {if(err) throw err});
+            }
+        }
+    });
 }
 
-function mergeStyles(srcPath, destPath) {
+function mergeStyles(src, dest) {
     let dataArr = [];
-    fs.readdir(srcPath, {withFileTypes: true}, (err, files) => {
+    fs.readdir(src, {withFileTypes: true}, (err, files) => {
         if(err) { throw err; }
         for(let file of files) {
             if(file.isFile() && path.extname(file.name) === '.css') {
-                dataArr.push(fs.promises.readFile(path.join(srcPath, file.name), 'utf-8'));
+                dataArr.push(fs.promises.readFile(path.join(src, file.name), ENCODE));
             }
         }
         Promise.all(dataArr).then(data => {
-            fs.promises.writeFile(destPath, data.join(`${os.EOL}`));
+            fs.promises.writeFile(dest, data.join(`${os.EOL}`));
         });
     });
 }
 
-function clearFolder(delPath) {
+/*
+async function clearFolder(clearPath) {
     return new Promise(resolve => {
-        fs.readdir(delPath, {withFileTypes: true}, (err, files) => {
+        fs.readdir(clearPath, {withFileTypes: true}, (err, files) => {
             if(err) { throw err; }
             for(let file of files) {
                 if(file.isDirectory()) {
-                    clearFolder(path.join(delPath, file.name));
+                    clearFolder(path.join(clearPath, file.name));
                 } else {
-                    fs.unlink(path.join(delPath, file.name), (err) => { if(err) throw err; });
+                    fs.unlink(path.join(clearPath, file.name), (err) => { if(err) throw err; });
                 }
             }
             resolve("Succes");
         });
     });
 }
-
-async function copyAssets(srcPath, destPath) {
-    await clearFolder(destPath).then(() => {
-        fs.readdir(srcPath, {withFileTypes: true}, async (err, files) => {
-            if(err) {throw err;}
-            for(let file of files) {
-                if(file.isDirectory()) {
-                    let dirPath = path.join(destAssetPath, path.basename(file.name));
-                    await createDirectory(dirPath);
-                    copyAssets(path.join(srcPath, path.basename(file.name)), dirPath);
-                } else if(file.isFile()) {
-                    fs.copyFile(path.join(srcPath, file.name), path.join(destPath, file.name), (err) => {if(err) throw err});
-                }
-            }
-        });
-    });
-}
+*/
