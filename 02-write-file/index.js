@@ -4,9 +4,10 @@ const path = require('node:path');
 const readline = require('node:readline');
 const { stdout } = require('node:process');
 
-const filePath = path.join(__dirname, 'text.txt');
-const stream = fs.createWriteStream(filePath, {encoding: 'utf-8'})
-    .on('open', () => stdout.write(`It’s nice to meet you! Enter your text please:${os.EOL}`));
+const FILE_PATH = path.join(__dirname, 'text.txt');
+
+const stream = fs.createWriteStream(FILE_PATH, {encoding: 'utf-8'})
+    .on('open', () => stdout.write(`It's nice to meet you! Enter your text please:${os.EOL}`));
 
 const rl = readline.createInterface({
     input: process.stdin,
